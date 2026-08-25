@@ -195,3 +195,32 @@ body {
     transform: rotate(6deg) translateY(30%);
   }
 }
+
+/*
+ * The admin's dropdowns.
+ *
+ * A native <select> draws its popup from the OS palette, not the page, so on a
+ * dark page the option list came up light while the text inherited our
+ * near-white foreground — white on white, unreadable. `color-scheme` is what
+ * tells the platform which palette to hand it, and it fixes the popup itself,
+ * which no amount of CSS on the element can reach.
+ *
+ * The closed control is ours: the native arrow is stripped and redrawn as a
+ * chevron so it matches the rest of the panel.
+ */
+select {
+  color-scheme: dark;
+  appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%23f4eee9' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 0.7rem;
+  cursor: pointer;
+}
+
+/* Firefox and Linux ignore color-scheme here, so say it outright too. */
+select option {
+  background: #1b1420;
+  color: var(--foreground);
+}

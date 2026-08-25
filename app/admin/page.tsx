@@ -14,6 +14,7 @@ import { getAdminWorld, type AdminSpot } from "@/lib/admin/query";
 import { logout } from "@/lib/auth/actions";
 import { requireUser } from "@/lib/auth/dal";
 
+import { Combobox } from "./Combobox";
 import { NewSpotPlacement } from "./NewSpotPlacement";
 import { PlacementField } from "./PlacementField";
 import { AltSubmitButton, SaveButton } from "./SaveButton";
@@ -77,13 +78,12 @@ function Field({
 function TypeSelect({ value }: { value: string }) {
   return (
     <Field label="Kind of thing">
-      <select name="type" defaultValue={value} className={input}>
-        {TYPES.map((t) => (
-          <option key={t} value={t}>
-            {t[0] + t.slice(1).toLowerCase()}
-          </option>
-        ))}
-      </select>
+      <Combobox
+        name="type"
+        defaultValue={value}
+        className={input}
+        options={TYPES.map((t) => ({ value: t, label: t[0] + t.slice(1).toLowerCase() }))}
+      />
     </Field>
   );
 }

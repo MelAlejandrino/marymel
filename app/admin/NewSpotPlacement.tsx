@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { SPOT_KINDS, type SpotKindName } from "@/game/world/spots/meta";
 
+import { Combobox } from "./Combobox";
 import { PlacementField } from "./PlacementField";
 
 /**
@@ -26,20 +27,18 @@ export function NewSpotPlacement({
         <span className="text-[0.7rem] font-medium tracking-wide uppercase opacity-50">
           What is it
         </span>
-        <select
+        <Combobox
           name="kind"
           value={kind}
-          onChange={(e) => setKind(e.target.value as SpotKindName)}
+          onChange={(v) => setKind(v as SpotKindName)}
           className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm
                      outline-none transition focus-visible:border-white/30
                      focus-visible:ring-2 focus-visible:ring-rose-400/60"
-        >
-          {(Object.keys(SPOT_KINDS) as SpotKindName[]).map((k) => (
-            <option key={k} value={k}>
-              {SPOT_KINDS[k].label}
-            </option>
-          ))}
-        </select>
+          options={(Object.keys(SPOT_KINDS) as SpotKindName[]).map((k) => ({
+            value: k,
+            label: SPOT_KINDS[k].label,
+          }))}
+        />
       </label>
 
       {/* Start it just inside the gate, where she comes in. */}
