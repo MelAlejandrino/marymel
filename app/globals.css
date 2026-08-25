@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #14101a;
+  --foreground: #f4eee9;
+  /* Behind the portrait column on wide screens. */
+  --backdrop: #0b0910;
 }
 
 @theme inline {
@@ -10,17 +12,186 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-hand: var(--font-hand);
+  --font-note: var(--font-note);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  height: 100%;
+  /* iOS enlarges text in landscape without this, which shifts the HUD. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
+  /* dvh, not vh: on a phone `100vh` measures the viewport *including* the
+     URL bar, so the bottom of the world sat below the fold and the page
+     scrolled. dvh tracks the bar as it hides. */
+  height: 100dvh;
+  overflow: hidden;
+  /* Kill rubber-band scrolling — dragging to look must not drag the page. */
+  overscroll-behavior: none;
+  background: var(--backdrop);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/*
+ * The app is portrait everywhere. On a phone the screen fills the display; on
+ * anything wider it becomes a phone-shaped column on a dark backdrop, so the
+ * composition the scene was framed for holds on a desktop too (PLAN §27).
+ */
+.stage {
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--background);
+}
+
+@media (min-aspect-ratio: 3 / 4) {
+  .screen {
+    /* 9:19.5 is a current phone. min() keeps it on screen when the window is
+       short and wide rather than letting the column overflow. */
+    width: min(100vw, calc(100dvh * 9 / 19.5));
+    height: min(100dvh, calc(100vw * 19.5 / 9));
+    border-radius: 20px;
+    box-shadow: 0 24px 70px rgb(0 0 0 / 0.55);
+  }
+}
+
+/*
+ * A phone held sideways would get a column barely 180px wide, so ask for
+ * portrait instead of rendering something unplayable.
+ */
+.rotate-hint {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  .rotate-hint {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    text-align: center;
+    background: var(--backdrop);
+    color: var(--foreground);
+  }
+}
+
+/*
+ * Respect the notch and the home indicator now that viewport-fit is `cover`.
+ * Insets rather than padding: an absolutely positioned child is offset from
+ * its container's padding box, so padding here would not move the joystick.
+ */
+.safe-area {
+  position: absolute;
+  top: env(safe-area-inset-top);
+  right: env(safe-area-inset-right);
+  bottom: env(safe-area-inset-bottom);
+  left: env(safe-area-inset-left);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * The note easing in (PLAN §14). It arrives slightly turned, as though it were
+ * put down rather than rendered.
+ */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px) rotate(1.5deg) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-0.5deg);
+  }
+}
+
+/*
+ * Paper. Ruled lines drawn with a repeating gradient rather than an image, and
+ * a warm wash in one corner so the sheet is not a flat rectangle of cream.
+ */
+.note-paper {
+  background-color: #fdf6e6;
+  background-image:
+    radial-gradient(120% 90% at 12% 0%, rgb(255 255 255 / 0.75), transparent 60%),
+    radial-gradient(90% 70% at 100% 100%, rgb(214 168 122 / 0.22), transparent 65%);
+  color: #4a3b32;
+}
+
+.note-ruled {
+  /* 1.85rem matches the handwriting's line-height, so the words sit on the
+     lines instead of drifting across them. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 1.8rem,
+    rgb(120 145 170 / 0.22) 1.8rem,
+    rgb(120 145 170 / 0.22) calc(1.8rem + 1px)
+  );
+  line-height: 1.85rem;
+}
+
+/* A punched edge along the top, like a sheet torn from a pad. */
+.note-torn {
+  --tooth: 10px;
+  mask-image: radial-gradient(
+    var(--tooth) var(--tooth) at 50% 0,
+    transparent 0 calc(var(--tooth) - 1px),
+    #000 var(--tooth)
+  );
+  mask-size: calc(var(--tooth) * 2) 100%;
+  mask-repeat: repeat-x;
+}
+
+/*
+ * The capsule rocking, then splitting open. Two halves so the seam is real
+ * rather than a spinner standing in for one.
+ */
+@keyframes capsule-top {
+  0%,
+  55% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  25% {
+    transform: rotate(3deg) translateY(0);
+  }
+  100% {
+    transform: rotate(-8deg) translateY(-38%);
+  }
+}
+
+@keyframes capsule-bottom {
+  0%,
+  55% {
+    transform: rotate(3deg) translateY(0);
+  }
+  25% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  100% {
+    transform: rotate(6deg) translateY(30%);
+  }
 }
