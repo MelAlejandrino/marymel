@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 
 import { resolve } from "../../game/collision.ts";
+import { findNearest } from "../../game/interaction/nearest.ts";
+import { actionRange, FURNITURE } from "../../game/world/furniture.ts";
 import {
   collidersFor,
   PLAYER_RADIUS,
@@ -61,6 +63,51 @@ for (const spot of SEED_SPOTS) {
 
   assert.ok(spot.title === spot.title.toLowerCase(), `${where}: titles read inside a
     sentence ("Read the note on the step"), so they stay lowercase`);
+}
+
+// --- the furniture must not steal the prompt --------------------------------
+// Furniture she can do something with takes a prompt, and `findNearest` simply
+// picks whichever thing is closest. So a sofa parked next to a letter would
+// answer instead of the letter, and the letter would be unreachable while
+// sitting in plain sight. For each spot there has to be somewhere she can stand
+// where the spot itself is what the prompt offers.
+const FURNITURE_CANDIDATES = FURNITURE.filter((item) => item.action).map(
+  (item, i) => ({
+    id: `furniture:${i}`,
+    x: item.x,
+    z: item.z,
+    range: actionRange(item),
+    enabled: true,
+  }),
+);
+
+for (const spot of SEED_SPOTS) {
+  const candidate = {
+    id: `spot:${spot.title}`,
+    x: spot.x,
+    z: spot.z,
+    range: RANGE[spot.kind],
+    enabled: true,
+  };
+  const all = [candidate, ...FURNITURE_CANDIDATES];
+
+  // Sweep the ring she would approach from, at a few distances: right up
+  // against it is best, but a frame flat on a wall cannot be stood on.
+  const winnable = [0.55, 0.75, 0.95].some((fraction) =>
+    Array.from({ length: 24 }, (_, i) => {
+      const a = (i / 24) * Math.PI * 2;
+      const r = candidate.range * fraction;
+      return { x: spot.x + Math.cos(a) * r, z: spot.z + Math.sin(a) * r };
+    }).some(
+      (p) =>
+        isStandable(p.x, p.z) && findNearest(all, p)?.id === candidate.id,
+    ),
+  );
+
+  assert.ok(
+    winnable,
+    `"${spot.title}" is drowned out by the furniture — there is nowhere to stand where it wins the prompt`,
+  );
 }
 
 // Nothing may sit on top of anything else.

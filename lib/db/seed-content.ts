@@ -6,8 +6,8 @@ import type { SpotKind } from "./schema.ts";
  * Placeholder content only — no real names, photos, or messages. Replace it
  * through the admin dashboard rather than by editing this file.
  *
- * Coordinates are world units: the cottage interior is roughly x -4.3..4.3,
- * z -11.8..-5.2, the garden runs out to the fence at +/-15, and the path down
+ * Coordinates are world units: the cottage interior is roughly x -6.8..6.8,
+ * z -14.8..-5.2, the garden runs out to the fence at +/-24, and the path down
  * the middle is |x| < 1.5. `seed-content.test.ts` checks every placement is
  * out of the walls and standable next to.
  */
@@ -44,8 +44,8 @@ export const SEED_SPOTS: SeedSpot[] = [
   {
     kind: "ARCADE",
     title: "the claw machine",
-    x: 2.3,
-    z: -10.9,
+    x: 2.6,
+    z: -14,
     // `game` picks the cabinet's visual and its mini-game (PLAN mini-game
     // registry). Adding another needs no migration.
     config: { game: "claw" },
@@ -59,8 +59,8 @@ export const SEED_SPOTS: SeedSpot[] = [
   {
     kind: "ARCADE",
     title: "the photo booth",
-    x: -2.3,
-    z: -10.9,
+    x: -2.6,
+    z: -14,
     config: { game: "booth" },
     prizes: [
       { title: "A strip of four", message: placeholder, type: "PHOTO" },
@@ -74,8 +74,8 @@ export const SEED_SPOTS: SeedSpot[] = [
   {
     kind: "FRAME",
     title: "the picture by the window",
-    x: -4,
-    z: -8.2,
+    x: -6.6,
+    z: -8.6,
     // Facing +x, into the room, off the left-hand wall.
     rotation: Math.PI / 2,
     config: { tint: 0 },
@@ -84,8 +84,8 @@ export const SEED_SPOTS: SeedSpot[] = [
   {
     kind: "FRAME",
     title: "the little portrait",
-    x: 4,
-    z: -8.2,
+    x: 6.6,
+    z: -8.6,
     rotation: -Math.PI / 2,
     config: { tint: 3 },
     memory: { title: "Another photo", message: placeholder, type: "PHOTO" },
@@ -93,8 +93,8 @@ export const SEED_SPOTS: SeedSpot[] = [
   {
     kind: "FRAME",
     title: "the picture in the garden",
-    x: 5.6,
-    z: 1.8,
+    x: 8.8,
+    z: 2.4,
     rotation: -0.5,
     config: { tint: 1 },
     memory: { title: "Somewhere we went", message: placeholder, type: "PHOTO" },
@@ -104,8 +104,8 @@ export const SEED_SPOTS: SeedSpot[] = [
   {
     kind: "LETTER",
     title: "the note on the step",
-    x: 1.05,
-    z: -3.3,
+    x: 1.9,
+    z: -2.6,
     rotation: 0.2,
     memory: {
       title: "Before you go in",
@@ -116,8 +116,8 @@ export const SEED_SPOTS: SeedSpot[] = [
   {
     kind: "LETTER",
     title: "the note under the tree",
-    x: -6.4,
-    z: 3.4,
+    x: -8.6,
+    z: 4.6,
     rotation: 0.7,
     memory: { title: "Something I meant to say", message: placeholder, type: "LETTER" },
   },
@@ -127,21 +127,21 @@ export const SEED_SPOTS: SeedSpot[] = [
     kind: "KEEPSAKE",
     title: "something behind the house",
     x: 0.8,
-    z: -13.5,
+    z: -17,
     memory: { title: "An inside joke", message: placeholder, type: "SPECIAL" },
   },
   {
     kind: "KEEPSAKE",
     title: "something by the gate",
-    x: -2.8,
-    z: 12.6,
+    x: -3.6,
+    z: 18.4,
     memory: { title: "The first thing", message: placeholder, type: "MEMORY" },
   },
   {
     kind: "KEEPSAKE",
     title: "something in the flowers",
-    x: 8.4,
-    z: -5.2,
+    x: 11.4,
+    z: -6.2,
     memory: { title: "A small gift", message: placeholder, type: "GIFT" },
   },
 ];

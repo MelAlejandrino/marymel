@@ -17,10 +17,12 @@ export function Lighting() {
       <directionalLight
         // Low and off to one side, so the cottage gets a lit face and a shaded
         // one instead of being evenly washed out.
-        position={[14, 11, 9]}
+        position={[22, 18, 14]}
         intensity={2.4}
         color="#ffdcb0"
         castShadow
+        // ponytail: the garden more than doubled, so the same map covers more
+        // ground per texel. 4096 if the shadow edges ever read as jagged.
         shadow-mapSize={[2048, 2048]}
         // Fit the shadow frustum to the fenced garden: any larger and the
         // texels get too coarse to hold an edge.
@@ -29,7 +31,7 @@ export function Lighting() {
         shadow-camera-top={WORLD_BOUNDS + 4}
         shadow-camera-bottom={-WORLD_BOUNDS - 4}
         shadow-camera-near={1}
-        shadow-camera-far={60}
+        shadow-camera-far={90}
         // Pulls the shadow off the surface casting it, killing the stripes
         // that otherwise crawl across large flat ground planes.
         shadow-bias={-0.0006}

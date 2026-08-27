@@ -21,7 +21,8 @@ import { OpeningCapsule } from "./ui/OpeningCapsule.tsx";
 import { useLookDrag } from "./ui/useLookDrag.ts";
 import { Door } from "./world/Door.tsx";
 import { Environment } from "./world/Environment.tsx";
-import { HOUSE, HOUSE_CENTRE_Z } from "./world/layout.ts";
+import { Furnishings } from "./world/Furniture.tsx";
+import { HOUSE } from "./world/layout.ts";
 import { PALETTE } from "./world/palette.ts";
 import { Spots } from "./world/spots/index.tsx";
 
@@ -160,7 +161,7 @@ export function World({
         // a difference nobody sees at this art style (PLAN §28).
         dpr={[1, 2]}
         // fov is a starting value; AdaptiveFov sets it from the aspect.
-        camera={{ fov: 60, near: 0.1, far: 220, position: [0, 4.4, 13] }}
+        camera={{ fov: 60, near: 0.1, far: 320, position: [0, 4.4, 21] }}
         gl={{
           // Filmic tone mapping keeps the warm key light from blowing out the
           // cream walls, which is most of why the scene reads as lit rather
@@ -172,7 +173,7 @@ export function World({
       >
         {/* Fog tuned to start past the cottage, so the garden stays crisp and
             only the far treeline softens into the horizon. */}
-        <fog attach="fog" args={[PALETTE.fog, 34, 95]} />
+        <fog attach="fog" args={[PALETTE.fog, 48, 140]} />
 
         <AdaptiveFov horizontal={60} />
 
@@ -186,6 +187,12 @@ export function World({
           onInteract={() => setDoorOpen((open) => !open)}
         />
         <Spots spots={spots} onInteract={handleInteract} playingId={playing?.id} />
+        {/*
+          The furniture is content, not scenery: she sits on it, opens it and
+          switches it on. It owns its own state and talks to the player through
+          `player/seat.ts`, so nothing has to be threaded down from here.
+        */}
+        <Furnishings />
         <Player doorOpen={doorOpen} paused={playing !== null} />
 
         {playing && (
@@ -207,13 +214,8 @@ export function World({
           />
         )}
 
-        {/* Hearth glow inside, so an open door reveals somewhere warm. */}
-        <pointLight
-          position={[0, 1.5, HOUSE_CENTRE_Z + 0.5]}
-          color="#ffc98a"
-          intensity={doorOpen ? 26 : 10}
-          distance={14}
-        />
+        {/* Warm spill through the open doorway. The room lights itself now —
+            the fire and the lamps live with the furniture. */}
         <pointLight
           position={[0, 1.4, HOUSE.frontZ + 1.2]}
           color="#ffd39a"

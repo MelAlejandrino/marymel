@@ -11,6 +11,8 @@ import {
   collidersFor,
   DOOR,
   FRONT_SEGMENTS,
+  frontWallHoles,
+  frontWallOutline,
   gableOutline,
   HOUSE,
   HOUSE_BACK_INNER,
@@ -142,6 +144,70 @@ assert.ok(DOOR.halfWidth > PLAYER_RADIUS + 0.1, "doorway too narrow to walk thro
 const inside = resolve({ x: 0, z: HOUSE.backZ + 2 }, PLAYER_RADIUS, open, WORLD_BOUNDS);
 close(inside.x, 0, "inside the house is clear (x)");
 close(inside.z, HOUSE.backZ + 2, "inside the house is clear (z)");
+
+// --- the front wall's openings ---------------------------------------------
+// The wall is extruded from an outline with holes punched in it, so the window
+// is a real opening you can see glass in from either side. When it was built
+// from boxes instead, the pane could only ever be stuck on the outside face —
+// and from the armchair you saw a curtain hanging on blank plaster.
+const elevation = frontWallOutline();
+for (const [x, y] of elevation) {
+  close(Math.abs(x), OUTER_HALF_WIDTH, "front wall spans the full width");
+  assert.ok(
+    y === 0 || Math.abs(y - HOUSE.wallHeight) < 1e-9,
+    `front wall corner at y ${y} is neither ground nor wall-top`,
+  );
+}
+assert.ok(
+  elevation.some(([, y]) => y === 0) && elevation.some(([, y]) => y > 0),
+  "the elevation must have height",
+);
+
+const holes = frontWallHoles();
+assert.equal(holes.length, WINDOWS.length + 1, "one hole per window, plus the doorway");
+
+const bounds = (hole: Array<[number, number]>) => ({
+  minX: Math.min(...hole.map(([x]) => x)),
+  maxX: Math.max(...hole.map(([x]) => x)),
+  minY: Math.min(...hole.map(([, y]) => y)),
+  maxY: Math.max(...hole.map(([, y]) => y)),
+});
+
+// Every hole has to sit strictly inside the outline. Touching the edge is a
+// degenerate case for the triangulator, not a tidy flush join, and it shows up
+// as slivers in the finished wall.
+for (const hole of holes) {
+  const b = bounds(hole);
+  assert.equal(hole.length, 4, "each opening is a rectangle");
+  assert.ok(b.minX > -OUTER_HALF_WIDTH, "an opening breaks the left edge of the wall");
+  assert.ok(b.maxX < OUTER_HALF_WIDTH, "an opening breaks the right edge of the wall");
+  assert.ok(b.minY > 0, "an opening reaches the ground line — degenerate extrusion");
+  assert.ok(b.maxY < HOUSE.wallHeight, "an opening breaks through the wall-top");
+}
+
+// ...but the doorway still has to come near enough to the ground that there is
+// no step in it. The interior floor sits at y 0.02 and covers the remainder.
+const doorway = holes.find((hole) => bounds(hole).minY < 0.02);
+assert.ok(doorway, "the doorway must reach the floor");
+const doorBounds = bounds(doorway);
+close(doorBounds.maxX, DOOR.halfWidth, "the doorway hole matches the door");
+close(doorBounds.minX, -DOOR.halfWidth, "the doorway hole matches the door");
+assert.ok(doorBounds.maxY >= DOOR.height, "the doorway hole is shorter than the door");
+
+// Each window's hole is exactly the pane, and clear of the doorway's.
+for (const win of WINDOWS) {
+  const hole = holes.find((h) => Math.abs(bounds(h).minX + WINDOW.width / 2 - win.x) < 1e-9);
+  assert.ok(hole, `no opening cut for the window at x ${win.x}`);
+  const b = bounds(hole);
+  close(b.maxX - b.minX, WINDOW.width, "window hole is the width of the pane");
+  close(b.maxY - b.minY, WINDOW.height, "window hole is the height of the pane");
+  assert.ok(b.minY > 0, "a window hole reaching the ground would be a doorway");
+  // Holes must not touch, or the wall between them disappears.
+  assert.ok(
+    b.minX > doorBounds.maxX || b.maxX < doorBounds.minX,
+    "a window opening runs into the doorway",
+  );
+}
 
 // --- decoration placement ---------------------------------------------------
 // The complaint that started this file was things not lining up, so the

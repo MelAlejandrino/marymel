@@ -1,13 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
-import { DoubleSide, Shape } from "three";
+import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef } from "react";
+import {
+  DoubleSide,
+  Path,
+  Shape,
+  type Mesh,
+  type PointLight,
+} from "three";
 
+import { decayBlaze, fireIntensity, hearth } from "./hearth.ts";
 import { PALETTE } from "./palette.ts";
 import {
   BACK_WALL,
   DOOR,
-  FRONT_SEGMENTS,
+  frontWallHoles,
+  frontWallOutline,
   gableOutline,
   HOUSE,
   HOUSE_BACK_OUTER,
@@ -17,6 +26,7 @@ import {
   OUTER_HALF_WIDTH,
   CHIMNEY,
   DOORSTEP,
+  HEARTH,
   GABLE_WINDOW,
   LANTERNS,
   RIDGE_Y,
@@ -25,6 +35,7 @@ import {
   roofSlabs,
   SIDE_WALLS,
   WINDOW,
+  WINDOW_BOX,
   WINDOWS,
 } from "./layout.ts";
 
@@ -38,56 +49,169 @@ function Wall({ x, z, hx, hz }: { x: number; z: number; hx: number; hz: number }
   );
 }
 
-/** Cottage window: recess, glowing pane, frame and mullions. */
+/**
+ * Cottage window.
+ *
+ * The wall has an actual hole in it (see `FrontWall`), so this is only the
+ * glass and the joinery around it — and the joinery is fitted to *both* faces.
+ * That is the whole fix for "inside there is a curtain and then the wall":
+ * there was never an opening, just a pane stuck on the outside.
+ */
 function Window({ x, y }: { x: number; y: number }) {
   const w = WINDOW.width;
   const h = WINDOW.height;
   const f = WINDOW.frame;
-  const z = HOUSE.frontZ + HOUSE.wallThickness / 2;
+  const t = HOUSE.wallThickness;
+  /** Larger z is outdoors; the room is at smaller z. */
+  const outer = HOUSE.frontZ + t / 2;
+  const inner = HOUSE.frontZ - t / 2;
+
+  /** Frame bars around an opening, on whichever face. */
+  const bars = (depth: number) =>
+    [
+      { p: [0, h / 2 + f / 2, 0], s: [w + f * 2, f, depth] },
+      { p: [0, -h / 2 - f / 2, 0], s: [w + f * 2, f, depth] },
+      { p: [-w / 2 - f / 2, 0, 0], s: [f, h + f * 2, depth] },
+      { p: [w / 2 + f / 2, 0, 0], s: [f, h + f * 2, depth] },
+    ] as const;
 
   return (
-    <group position={[x, y, z]}>
-      <mesh position={[0, 0, 0.01]}>
-        <boxGeometry args={[w, h, 0.06]} />
+    <group position={[x, y, 0]}>
+      {/*
+        Glass, in the middle of the wall's thickness. Transparent rather than an
+        opaque glowing slab: from the garden it catches the low sun, and from
+        the armchair you can see the trees. Double-sided, or it vanishes from
+        one side.
+      */}
+      <mesh position={[0, 0, HOUSE.frontZ]}>
+        <boxGeometry args={[w, h, 0.03]} />
         <meshStandardMaterial
           color={PALETTE.paneLit}
           emissive={PALETTE.paneLit}
-          emissiveIntensity={0.85}
-          roughness={0.3}
+          emissiveIntensity={0.28}
+          transparent
+          opacity={0.32}
+          roughness={0.12}
+          metalness={0.1}
+          side={DoubleSide}
         />
       </mesh>
 
-      {/* Frame: four bars around the pane rather than a slab behind it. */}
+      {/* Reveal: the four inside faces of the hole, so the opening has depth
+          instead of showing a paper-thin edge. */}
       {[
-        { p: [0, h / 2 + f / 2, 0.04], s: [w + f * 2, f, 0.14] },
-        { p: [0, -h / 2 - f / 2, 0.04], s: [w + f * 2, f, 0.14] },
-        { p: [-w / 2 - f / 2, 0, 0.04], s: [f, h + f * 2, 0.14] },
-        { p: [w / 2 + f / 2, 0, 0.04], s: [f, h + f * 2, 0.14] },
-      ].map((bar, i) => (
-        <mesh key={i} position={bar.p as [number, number, number]} castShadow>
-          <boxGeometry args={bar.s as [number, number, number]} />
-          <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
+        { p: [0, h / 2 + 0.01, HOUSE.frontZ], s: [w, 0.02, t] },
+        { p: [0, -h / 2 - 0.01, HOUSE.frontZ], s: [w, 0.02, t] },
+        { p: [-w / 2 - 0.01, 0, HOUSE.frontZ], s: [0.02, h, t] },
+        { p: [w / 2 + 0.01, 0, HOUSE.frontZ], s: [0.02, h, t] },
+      ].map((face, i) => (
+        <mesh key={i} position={face.p as [number, number, number]}>
+          <boxGeometry args={face.s as [number, number, number]} />
+          <meshStandardMaterial color={PALETTE.wallShade} roughness={0.95} />
         </mesh>
       ))}
 
-      <mesh position={[0, 0, 0.06]}>
-        <boxGeometry args={[0.06, h, 0.06]} />
-        <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 0, 0.06]}>
-        <boxGeometry args={[w, 0.06, 0.06]} />
-        <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
-      </mesh>
+      {/* Joinery, outside and in. */}
+      {([outer, inner] as const).map((z, face) => {
+        const push = face === 0 ? 0.06 : -0.06;
+        return (
+          <group key={face} position={[0, 0, z + push]}>
+            {bars(0.13).map((bar, i) => (
+              <mesh key={i} position={bar.p as [number, number, number]} castShadow>
+                <boxGeometry args={bar.s as [number, number, number]} />
+                <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
+              </mesh>
+            ))}
+            {/* Mullions: one upright, one transom. */}
+            <mesh>
+              <boxGeometry args={[0.055, h, 0.05]} />
+              <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
+            </mesh>
+            <mesh>
+              <boxGeometry args={[w, 0.055, 0.05]} />
+              <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
+            </mesh>
+            {/* Sill. The outside one is deep enough to carry the flower box;
+                the inside one is a shelf you could stand a candle on. */}
+            <mesh
+              position={[0, -h / 2 - WINDOW.sillDrop, face === 0 ? 0.04 : -0.04]}
+              castShadow
+            >
+              <boxGeometry args={[w + 0.42, 0.1, face === 0 ? 0.3 : 0.22]} />
+              <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
+            </mesh>
+          </group>
+        );
+      })}
 
-      {/* Sill */}
-      <mesh position={[0, -h / 2 - WINDOW.sillDrop, 0.08]} castShadow>
-        <boxGeometry args={[w + 0.42, 0.1, 0.26]} />
-        <meshStandardMaterial color={PALETTE.timber} roughness={0.8} />
-      </mesh>
+      {/* Flower box on the outside sill. Three blossoms is enough to read as
+          planted; a real bouquet's worth just costs draw calls nobody sees. */}
+      <group
+        position={[0, -h / 2 - WINDOW.sillDrop - WINDOW_BOX.height / 2, outer + 0.22]}
+      >
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[WINDOW_BOX.width, WINDOW_BOX.height, WINDOW_BOX.depth]} />
+          <meshStandardMaterial color={PALETTE.timber} roughness={0.9} flatShading />
+        </mesh>
+        {[-1, 0, 1].map((i) => (
+          <mesh key={i} position={[i * 0.46, WINDOW_BOX.height / 2 + 0.06, 0]}>
+            <icosahedronGeometry args={[0.16, 0]} />
+            <meshStandardMaterial
+              color={PALETTE.blossom[(i + 1) % PALETTE.blossom.length]}
+              roughness={0.8}
+              flatShading
+            />
+          </mesh>
+        ))}
+      </group>
 
-      {/* Light spilling out onto the wall below. */}
-      <pointLight position={[0, 0, 0.5]} color={PALETTE.paneLit} intensity={2.2} distance={4} />
+      {/* Sat in the opening, so it warms the wall outside and the room inside
+          from one light rather than two. */}
+      <pointLight
+        position={[0, 0, HOUSE.frontZ]}
+        color={PALETTE.paneLit}
+        intensity={3.4}
+        distance={6}
+      />
     </group>
+  );
+}
+
+/**
+ * The front wall, extruded from its elevation with the doorway and both
+ * windows cut out of it as holes.
+ */
+function FrontWall() {
+  const shape = useMemo(() => {
+    const outline = frontWallOutline();
+    const s = new Shape();
+    s.moveTo(outline[0][0], outline[0][1]);
+    for (const [x, y] of outline.slice(1)) s.lineTo(x, y);
+    s.closePath();
+
+    s.holes = frontWallHoles().map((hole) => {
+      const path = new Path();
+      path.moveTo(hole[0][0], hole[0][1]);
+      for (const [x, y] of hole.slice(1)) path.lineTo(x, y);
+      path.closePath();
+      return path;
+    });
+    return s;
+  }, []);
+
+  return (
+    <mesh
+      // ExtrudeGeometry runs along +z from the shape's plane, so start at the
+      // wall's inner face and it finishes flush with the outer one.
+      position={[0, 0, HOUSE.frontZ - HOUSE.wallThickness / 2]}
+      castShadow
+      receiveShadow
+    >
+      <extrudeGeometry
+        args={[shape, { depth: HOUSE.wallThickness, bevelEnabled: false }]}
+      />
+      <meshStandardMaterial color={PALETTE.wall} roughness={0.92} side={DoubleSide} />
+    </mesh>
   );
 }
 
@@ -114,15 +238,64 @@ function Gable({ z }: { z: number }) {
   );
 }
 
+/**
+ * The fire in the hearth.
+ *
+ * It flickers on its own and flares when a log goes on, which is what makes
+ * "put a log on the fire" an action rather than a line of text. The blaze lives
+ * in `hearth.ts` because the log basket is furniture and the fire is part of
+ * the building — a shared number is the whole mechanism between them.
+ */
+function Fire() {
+  const embers = useRef<Mesh>(null);
+  const light = useRef<PointLight>(null);
+
+  useFrame((state, delta) => {
+    hearth.blaze = decayBlaze(hearth.blaze, delta);
+    const t = state.clock.elapsedTime;
+
+    if (light.current) light.current.intensity = fireIntensity(hearth.blaze, t);
+    if (embers.current) {
+      // The embers swell with the blaze and breathe with the flicker.
+      const swell = 1 + hearth.blaze * 0.5 + Math.sin(t * 6.1) * 0.05;
+      embers.current.scale.setScalar(swell);
+    }
+  });
+
+  return (
+    <group position={[-0.55, 0.3, 0]}>
+      <mesh ref={embers}>
+        <icosahedronGeometry args={[0.36, 0]} />
+        <meshStandardMaterial
+          color="#ff9a4a"
+          emissive="#ff7a2a"
+          emissiveIntensity={2.4}
+          flatShading
+        />
+      </mesh>
+      {/* Logs in the grate, so the fire is burning something. */}
+      {[-0.1, 0.12].map((z, i) => (
+        <mesh
+          key={z}
+          position={[0.06, -0.24, z]}
+          rotation={[Math.PI / 2, 0, i ? 0.4 : -0.3]}
+        >
+          <cylinderGeometry args={[0.07, 0.065, 0.5, 7]} />
+          <meshStandardMaterial color="#4a3128" roughness={1} flatShading />
+        </mesh>
+      ))}
+      <pointLight ref={light} position={[-0.35, 0.3, 0]} color="#ff9a52" distance={13} />
+    </group>
+  );
+}
+
 export function House() {
   const slabs = roofSlabs();
   const chimneyBase = roofHeightAt(CHIMNEY.x) - CHIMNEY.sink;
 
   return (
     <group>
-      {FRONT_SEGMENTS.map((wall, i) => (
-        <Wall key={`front-${i}`} {...wall} />
-      ))}
+      <FrontWall />
       {SIDE_WALLS.map((wall, i) => (
         <Wall key={`side-${i}`} {...wall} />
       ))}
@@ -142,25 +315,41 @@ export function House() {
         <Window key={win.x} {...win} />
       ))}
 
-      {/*
-        Wall above the doorway. The front segments stop either side of the
-        opening, so without this the gap runs the full wall height and you can
-        see daylight over the door.
-      */}
-      <mesh
-        position={[0, (DOOR.height + HOUSE.wallHeight) / 2, HOUSE.frontZ]}
-        castShadow
-        receiveShadow
-      >
-        <boxGeometry
-          args={[
-            DOOR.halfWidth * 2,
-            HOUSE.wallHeight - DOOR.height,
-            HOUSE.wallThickness,
+      {/* The hearth, set into the right-hand wall under the chimney — which
+          until now vented nothing. */}
+      <group position={[HEARTH.x, 0, HEARTH.z]}>
+        <mesh position={[-HEARTH.depth / 2, HEARTH.height / 2 + 0.25, 0]} castShadow receiveShadow>
+          <boxGeometry args={[HEARTH.depth, HEARTH.height + 0.5, HEARTH.width + 0.7]} />
+          <meshStandardMaterial color={PALETTE.stone} roughness={0.98} flatShading />
+        </mesh>
+        {/* Firebox: a dark recess cut back into the stone. */}
+        <mesh position={[-HEARTH.depth / 2 + 0.06, HEARTH.height / 2, 0]}>
+          <boxGeometry args={[HEARTH.depth, HEARTH.height, HEARTH.width]} />
+          <meshStandardMaterial color="#2b1c18" roughness={1} />
+        </mesh>
+        <Fire />
+        {/* Flue, carrying the hearth up to where the chimney breaks the roof.
+            Without it the stack starts in mid-air above the fireplace. */}
+        <mesh
+          position={[
+            CHIMNEY.x - HEARTH.x,
+            (HEARTH.height + 0.4 + chimneyBase) / 2,
+            0,
           ]}
-        />
-        <meshStandardMaterial color={PALETTE.wall} roughness={0.92} side={DoubleSide} />
-      </mesh>
+          castShadow
+        >
+          <boxGeometry
+            args={[CHIMNEY.width, chimneyBase - HEARTH.height - 0.4, CHIMNEY.width]}
+          />
+          <meshStandardMaterial color={PALETTE.wallShade} roughness={0.95} />
+        </mesh>
+
+        {/* Mantel */}
+        <mesh position={[-HEARTH.depth / 2 - 0.06, HEARTH.height + 0.32, 0]} castShadow>
+          <boxGeometry args={[HEARTH.depth + 0.24, 0.16, HEARTH.width + 1]} />
+          <meshStandardMaterial color={PALETTE.timber} roughness={0.85} />
+        </mesh>
+      </group>
 
       {/* Decorative beam across the head of the door. */}
       <mesh position={[0, DOOR.height + 0.18, HOUSE.frontZ]} castShadow>

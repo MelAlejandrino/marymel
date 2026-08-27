@@ -3,12 +3,14 @@
 import { useId, useRef, useState } from "react";
 
 import { insideBox, resolve } from "@/game/collision";
+import { footprint, FURNITURE } from "@/game/world/furniture";
 import {
   BACK_WALL,
   collidersFor,
   DOOR,
   FENCE,
   FRONT_SEGMENTS,
+  HEARTH_COLLIDER,
   HOUSE,
   HOUSE_BACK_OUTER,
   HOUSE_FRONT_OUTER,
@@ -101,6 +103,20 @@ function isReachable(x: number, z: number, kind: string): boolean {
     return Math.abs(settled.x - p.x) < 1e-6 && Math.abs(settled.z - p.z) < 1e-6;
   });
 }
+
+/** What each piece is called, for the label on the map. */
+const FURNITURE_LABEL: Record<string, string> = {
+  sofa: "sofa",
+  armchair: "chair",
+  coffeeTable: "table",
+  bookshelf: "shelves",
+  bed: "bed",
+  roundTable: "table",
+  chair: "chair",
+  console: "console",
+  plant: "plant",
+  logBasket: "logs",
+};
 
 const Wall = ({ x, z, hx, hz }: { x: number; z: number; hx: number; hz: number }) => (
   <rect
@@ -247,6 +263,59 @@ export function PlacementField({
           fill="#c98b6b"
         />
 
+        {/*
+          --- the furniture ------------------------------------------------
+          Drawn from the same `FURNITURE` list the game builds its meshes and
+          its colliders from, so what you see here is exactly what she will
+          walk into. `isReachable` already refused to place a spot inside a
+          sofa; the only thing missing was being able to see the sofa.
+        */}
+        {FURNITURE.map((item, i) => {
+          const box = footprint(item);
+          const label = FURNITURE_LABEL[item.kind] ?? item.kind;
+          return (
+            <g key={`fur${i}`}>
+              <rect
+                x={box.x - box.hx}
+                y={box.z - box.hz}
+                width={box.hx * 2}
+                height={box.hz * 2}
+                rx={0.18}
+                fill="#8a6a52"
+                fillOpacity={0.55}
+                stroke="#c39a6b"
+                strokeWidth={0.09}
+              />
+              {/* Only label what there is room to label, or the room turns
+                  into a wall of overlapping text. */}
+              {box.hx > 0.5 && box.hz > 0.5 && (
+                <text
+                  x={box.x}
+                  y={box.z + 0.28}
+                  textAnchor="middle"
+                  fill="#f2e4d0"
+                  fillOpacity={0.75}
+                  style={{ fontSize: 0.75, pointerEvents: "none" }}
+                >
+                  {label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+        {/* The hearth: solid, and the one thing in the room that is on fire. */}
+        <rect
+          x={HEARTH_COLLIDER.x - HEARTH_COLLIDER.hx}
+          y={HEARTH_COLLIDER.z - HEARTH_COLLIDER.hz}
+          width={HEARTH_COLLIDER.hx * 2}
+          height={HEARTH_COLLIDER.hz * 2}
+          rx={0.12}
+          fill="#a8564a"
+          fillOpacity={0.7}
+          stroke="#ff9a4a"
+          strokeWidth={0.1}
+        />
+
         {/* --- trees -------------------------------------------------------- */}
         {TREES.map((t, i) => (
           <circle key={i} cx={t.x} cy={t.z} r={1.1 * t.scale} fill="#5f8049" opacity={0.75} />
@@ -335,7 +404,8 @@ export function PlacementField({
         <p className="max-w-56 flex-1 text-xs leading-relaxed opacity-45">
           Drag the pin to move it. The soft ring is how close she has to get. The
           line shows which way it faces — matters for a photo frame against a
-          wall, less so for a keepsake on the ground.
+          wall, less so for a keepsake on the ground. Brown blocks are furniture
+          and the red one is the hearth: the pin turns red over anything solid.
         </p>
       </div>
     </div>

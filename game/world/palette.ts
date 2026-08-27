@@ -36,17 +36,41 @@ export const PALETTE = {
   leaves: ["#7fa86a", "#8fba77", "#6f9a5e"],
   blossom: ["#f2a2ae", "#f7d6e0", "#ffd9a0", "#e8b4d0"],
 
+  /** Indoors. Warmer and lower-contrast than the exterior, so the room reads
+   *  as lamplit rather than as more garden with a roof over it. */
+  home: {
+    oak: "#c39a6b",
+    oakDark: "#9c7449",
+    walnut: "#6f4b3a",
+    fabric: "#d8c3a5",
+    fabricShade: "#c2ab8c",
+    cushion: ["#e98aa4", "#f0c489", "#9fb6d8"],
+    duvet: "#fbf0e2",
+    linen: "#fffaf2",
+    metal: "#8d8074",
+    foliage: "#5f8a52",
+    pot: "#c08a63",
+    books: ["#a8564a", "#4f6b8a", "#7f8f4a", "#b5804a", "#7a5470"],
+    rug: "#c1738a",
+    rugTrim: "#f0d8c0",
+    ember: "#ff9a4a",
+  },
+
   avatar: {
     skin: "#f7d9c4",
     skinShade: "#eec4ab",
     hair: "#4b3239",
     hairSheen: "#63424a",
     dress: "#e98aa4",
+    dressLight: "#f4a3b8",
     dressTrim: "#ffd9e2",
+    sash: "#c65f80",
     apron: "#fff3e6",
     shoe: "#6d4a52",
     eye: "#33262c",
     blush: "#f0a0ad",
     ribbon: "#ffc2d1",
+    flower: "#fff0f4",
+    flowerCore: "#ffd06a",
   },
 } as const;

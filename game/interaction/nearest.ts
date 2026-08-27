@@ -13,7 +13,17 @@ export type InteractionVerb =
   | "COLLECT"
   | "PLAY"
   | "ENTER"
-  | "EXAMINE";
+  | "EXAMINE"
+  // The furniture's verbs. The prompt reads "verb + label", so the verb has to
+  // carry the action and the label only ever names the thing.
+  | "SIT"
+  | "LIE"
+  | "RISE"
+  | "TURN_ON"
+  | "TURN_OFF"
+  | "STOKE"
+  | "SEARCH"
+  | "RETURN";
 
 export type Interactable = {
   id: string;

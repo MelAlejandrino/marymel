@@ -103,7 +103,8 @@ function Spot({
     z: spot.z,
     range: kind.range,
     verb: unfilled ? "EXAMINE" : kind.verb,
-    label: spot.title,
+    // ponytail: a letter's title is the surprise — the prompt just says "read".
+    label: spot.kind === "LETTER" ? "" : spot.title,
     enabled: true,
     onInteract: () => onInteract(spot),
   });

@@ -12,6 +12,14 @@ const VERB_LABEL: Record<string, string> = {
   PLAY: "Play",
   ENTER: "Enter",
   EXAMINE: "Look at",
+  SIT: "Sit on",
+  LIE: "Lie on",
+  RISE: "Get up",
+  TURN_ON: "Turn on",
+  TURN_OFF: "Turn off",
+  STOKE: "Put a log on",
+  SEARCH: "Look through",
+  RETURN: "Put back",
 };
 
 /**
@@ -47,7 +55,7 @@ export function Hud({
               Press <kbd className="rounded bg-white/20 px-1.5 py-0.5">E</kbd>{" "}
             </span>
             <span className="sm:hidden">Tap to </span>
-            {verb?.toLowerCase()} {active.label}
+            {[verb?.toLowerCase(), active.label].filter(Boolean).join(" ")}
           </p>
         )}
       </div>

@@ -53,7 +53,7 @@ function matrixFor(p: Placement, y: number, scaleY = p.scale) {
 
 function Flowers() {
   const placements = useMemo(
-    () => scatter(90, 11, { minScale: 0.7, maxScale: 1.25 }),
+    () => scatter(230, 11, { minScale: 0.7, maxScale: 1.25 }),
     [],
   );
   const build = useMemo(
@@ -77,7 +77,7 @@ function Flowers() {
 
 function GrassTufts() {
   const placements = useMemo(
-    () => scatter(220, 29, { minScale: 0.55, maxScale: 1.15, pathHalfWidth: 1.2 }),
+    () => scatter(560, 29, { minScale: 0.55, maxScale: 1.15, pathHalfWidth: 1.2 }),
     [],
   );
   const build = useMemo(
@@ -99,7 +99,7 @@ function GrassTufts() {
 
 function Bushes() {
   const placements = useMemo(
-    () => scatter(18, 53, { minScale: 0.75, maxScale: 1.5 }),
+    () => scatter(46, 53, { minScale: 0.75, maxScale: 1.5 }),
     [],
   );
   const build = useMemo(
