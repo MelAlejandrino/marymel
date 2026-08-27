@@ -29,8 +29,35 @@ export const RIG = {
   /** Arms angled out, so the forearm clears the flare of the dress. */
   armOut: 0.16,
   legX: 0.1,
+  /**
+   * The shoe. Drawn as a capsule laid on its side and widened, not a box: the
+   * silhouette is all toe and heel, and a hard corner there is the single most
+   * blocky thing on her. `width`/`height`/`depth` are still the bounding box
+   * the shoe fills, so `shoeBottomY()` and the poses are unaffected.
+   */
   shoe: { drop: 0.045, width: 0.15, height: 0.09, depth: 0.22, forward: 0.03 },
-  dress: { bottomY: 0.45, topY: 0.99, rTop: 0.16, rBottom: 0.27 },
+  /**
+   * A ball at the knee, filling the joint. Two capsules pivoting against each
+   * other open a wedge of daylight the moment the knee bends; a ball a hair
+   * narrower than the thigh closes it without showing a seam.
+   */
+  knee: { r: 0.068 },
+  /**
+   * A short neck under the collar. It is meant to stay hidden — it exists so
+   * that tilting the head does not open a gap between the head and the dress.
+   */
+  neck: { y: 0.995, height: 0.12, rTop: 0.072, rBottom: 0.086 },
+  dress: {
+    bottomY: 0.45,
+    topY: 0.99,
+    rTop: 0.16,
+    rBottom: 0.27,
+    /** How far the waist draws in below the bodice. Small on purpose: enough
+     *  to give the silhouette a waist, not enough to read as a corset. */
+    waistPinch: 0.014,
+    /** Rolled hem, in trim colour, rounding off the bottom edge. */
+    hem: { tube: 0.019 },
+  },
   /** Hands, so the arms end in something instead of stopping. */
   hand: { r: 0.062 },
   /** Puff sleeve capping each shoulder. */
@@ -50,10 +77,19 @@ export const FACE = {
   blush: { x: 0.143, y: -0.042, z: 0.162, r: 0.045 },
   /** Half-torus, opened upward into a smile. */
   mouth: { y: -0.075, z: 0.225, r: 0.04, tube: 0.011 },
-  /** Brows sit above the eyes but below the crown cap, or the hair eats them. */
-  brow: { x: 0.088, y: 0.089, z: 0.211, w: 0.078, h: 0.019, d: 0.04, tilt: 0.16 },
-  /** Lashes ride on the eye, like the catchlight — offsets from its centre. */
-  lash: { dx: 0.012, dy: 0.032, dz: 0.006, w: 0.062, h: 0.016, d: 0.03, tilt: 0.35 },
+  /**
+   * Brows sit above the eyes but below the crown cap, or the hair eats them.
+   * Drawn as an arc, not a bar: a straight box on a round forehead reads as a
+   * sticker. `w` is the span it covers, `h` its thickness, `arc` how much of a
+   * circle it bends through.
+   */
+  brow: { x: 0.088, y: 0.089, z: 0.211, w: 0.078, h: 0.019, arc: Math.PI * 0.5, tilt: 0.16 },
+  /**
+   * The upper lash, an arc riding the rim of the eye itself — so `r` is
+   * measured against the eye's radius rather than the head's, and `dz` only
+   * lifts it clear of the surface it sits on.
+   */
+  lash: { r: 0.043, tube: 0.0085, arc: Math.PI * 0.55, dy: 0.001, dz: 0.008, tilt: 0.3 },
   /** Tiny on purpose: a chibi nose is a hint, not a feature. */
   nose: { y: -0.012, z: 0.245, r: 0.022 },
 } as const;
@@ -69,8 +105,6 @@ export const HAIR = {
     phiLength: Math.PI * 1.24,
     thetaLength: Math.PI * 0.82,
   },
-  /** Locks framing the face, below the crown and clear of the back shell. */
-  sideLock: { x: 0.17, y: 0.02, z: 0.12, r: 0.08 },
   /** A flower tucked in over one ear, sitting on the crown. */
   flower: { x: -0.176, y: 0.182, z: 0.079, r: 0.036, petals: 5 },
   ponytail: { y: 0.08, z: -0.23 },
@@ -107,11 +141,59 @@ export function sweepCovers(
   return rel <= phiLength;
 }
 
-/** Radius of the flared dress at a given height. */
+/**
+ * Lift a face feature out onto the skin, along its own normal.
+ *
+ * `rig.test.ts` keeps every feature's *centre* inside the head, which is what
+ * stops blobs floating off her face. A feature drawn as a flat arc then dips
+ * below the surface at both ends and half-vanishes, so the arcs — the brow, in
+ * practice — get pushed out until they graze it instead.
+ */
+export function onSkin(p: Point3, lift: number): [number, number, number] {
+  const d = distance(p);
+  if (d === 0) return [0, 0, 0];
+  const k = (RIG.headR + lift) / d;
+  return [p.x * k, p.y * k, p.z * k];
+}
+
+/**
+ * Radius of the flared dress at a given height.
+ *
+ * A curve rather than a straight line: the bodice draws in through the waist
+ * and the skirt flares out of it along an ease, which is most of what
+ * separates a dress from a cone. The lathed skirt and the sash that has to lie
+ * flat against it both read this one function, so they cannot drift apart.
+ *
+ * The curve stays inside the old straight taper everywhere, so anything that
+ * had to clear the dress still clears it.
+ */
 export function dressRadiusAt(y: number): number {
-  const { bottomY, topY, rTop, rBottom } = RIG.dress;
-  const t = Math.min(1, Math.max(0, (y - bottomY) / (topY - bottomY)));
-  return rBottom + (rTop - rBottom) * t;
+  const { bottomY, topY, rTop, rBottom, waistPinch } = RIG.dress;
+  // Measured *down* from the top, which is how the flare reads.
+  const u = Math.min(1, Math.max(0, (topY - y) / (topY - bottomY)));
+  // Slow out of the bodice, quick into the hem: an A-line, not a cone. The
+  // exponent is above one, so the curve is tangent to the bodice at the top and
+  // stays inside the old straight taper the whole way down.
+  const flare = Math.pow(u, 1.45);
+  // ...and a shallow pinch through the waist, faded out before the flare.
+  const waist = waistPinch * Math.sin(Math.PI * Math.min(1, u / 0.55));
+  return rTop + (rBottom - rTop) * flare - waist;
+}
+
+/**
+ * The skirt's silhouette as `[radius, y]` pairs, hem first, measured down from
+ * the waist — which is the skirt group's own origin.
+ *
+ * Ordered bottom to top because `LatheGeometry` derives its normals from the
+ * direction the profile runs: reversed, the dress renders inside out.
+ */
+export function skirtProfile(steps = 12): Array<[number, number]> {
+  const { topY, bottomY } = RIG.dress;
+  const length = topY - bottomY;
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const u = 1 - i / steps;
+    return [dressRadiusAt(topY - length * u), -length * u] as [number, number];
+  });
 }
 
 /** Where a hand ends up, given the outward angle of the arm. */
@@ -384,4 +466,16 @@ export function shoeBottomY(): number {
  */
 export function blend(from: number, to: number, t: number): number {
   return from + (to - from) * t;
+}
+
+/**
+ * Smootherstep, for the weight a blend runs on.
+ *
+ * A linear ramp starts and stops dead, which reads as a joint being driven
+ * rather than a body moving. Both endpoints are exact, so a finished pose is
+ * bit-for-bit the pose it always was — only the way she gets there changes.
+ */
+export function ease(t: number): number {
+  const u = Math.min(1, Math.max(0, t));
+  return u * u * u * (u * (u * 6 - 15) + 10);
 }

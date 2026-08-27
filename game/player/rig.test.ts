@@ -6,9 +6,11 @@ import {
   blend,
   blinkScale,
   BLINK,
+  ease,
   footFromHip,
   hemFrontY,
   kneeY,
+  onSkin,
   POSTURE,
   distance,
   dressRadiusAt,
@@ -18,6 +20,7 @@ import {
   polarAngle,
   RIG,
   shoeBottomY,
+  skirtProfile,
   sweepCovers,
   type Point3,
 } from "./rig.ts";
@@ -85,11 +88,52 @@ assert.ok(
   FACE.nose.y < FACE.eye.y && FACE.nose.y > FACE.mouth.y,
   "the nose belongs between the eyes and the mouth",
 );
-// The lash rides on the eye, so it is measured against the eye like the
-// catchlight is.
-const lashOff = distance({ x: FACE.lash.dx, y: FACE.lash.dy, z: FACE.lash.dz });
-assert.ok(lashOff < FACE.eye.r, `lash (${lashOff.toFixed(3)}) floats off the eye`);
-assert.ok(FACE.lash.dy > 0, "lashes belong on the upper lid");
+// The lash is an arc riding the rim of the eye, so it is measured against the
+// eye rather than the head: a hair wider than the eye, or it vanishes inside
+// the pupil; not much wider, or it becomes a hoop around it.
+assert.ok(
+  FACE.lash.r > FACE.eye.r,
+  `lash (${FACE.lash.r}) is buried inside the eye (${FACE.eye.r})`,
+);
+assert.ok(FACE.lash.r < FACE.eye.r * 1.25, "the lash has become a hoop round the eye");
+assert.ok(FACE.lash.dz > 0, "the lash belongs on the front of the eye");
+assert.ok(FACE.lash.tilt > 0, "the lash lifts at the outer corner");
+assert.ok(FACE.lash.arc > 0 && FACE.lash.arc < Math.PI, "the lash is an arc, not a ring");
+
+// The brow is an arc too, drawn with its apex on the brow line. Both the apex
+// and the ends have to stay clear of the hair above and the eye below, and
+// where the ends land is decided by the arc's own sagitta.
+{
+  const { brow } = FACE;
+  const radius = brow.w / (2 * Math.sin(brow.arc / 2));
+  const sagitta = radius * (1 - Math.cos(brow.arc / 2));
+  const [ax, ay, az] = onSkin({ x: brow.x, y: brow.y, z: brow.z }, 0.006);
+  assert.ok(
+    polarAngle({ x: ax, y: ay, z: az }) > HAIR.crown.thetaLength,
+    "the crown cap covers the apex of the brow",
+  );
+  assert.ok(
+    brow.y - sagitta > FACE.eye.y + FACE.eye.r * 0.9,
+    `the brow arc dips ${sagitta.toFixed(3)} onto the eye`,
+  );
+  assert.ok(brow.arc > 0 && brow.arc < Math.PI, "the brow is an arc, not a ring");
+}
+
+// `onSkin` puts a feature exactly where it says, without swinging it off its
+// own normal on the way.
+{
+  const p = { x: FACE.brow.x, y: FACE.brow.y, z: FACE.brow.z };
+  const [x, y, z] = onSkin(p, 0.01);
+  assert.ok(
+    Math.abs(distance({ x, y, z }) - (RIG.headR + 0.01)) < 1e-9,
+    "onSkin missed the surface",
+  );
+  assert.ok(
+    Math.abs(Math.atan2(y, z) - Math.atan2(p.y, p.z)) < 1e-9,
+    "onSkin swung the feature off its own normal",
+  );
+  assert.deepEqual(onSkin({ x: 0, y: 0, z: 0 }, 0.01), [0, 0, 0]);
+}
 
 // Blink: open nearly all the time, shut in the middle of the blink, and never
 // inverted (a negative scale turns the eye inside out).
@@ -126,22 +170,6 @@ for (const side of [-1, 1]) {
 // Straight ahead (+Z) is the face, and must be clear; straight back must not be.
 assert.equal(sweepCovers(Math.PI / 2, HAIR.back.phiStart, HAIR.back.phiLength), false);
 assert.equal(sweepCovers(Math.PI * 1.5, HAIR.back.phiStart, HAIR.back.phiLength), true);
-
-// Side locks: below the crown, clear of the back shell, and standing proud of
-// the crown cap so they are actually visible.
-for (const side of [-1, 1]) {
-  const lock = { ...HAIR.sideLock, x: HAIR.sideLock.x * side };
-  assert.ok(polarAngle(lock) > HAIR.crown.thetaLength, "side lock hides under the crown");
-  assert.equal(
-    sweepCovers(azimuth(lock), HAIR.back.phiStart, HAIR.back.phiLength),
-    false,
-    "side lock is swallowed by the back shell",
-  );
-  assert.ok(
-    distance(lock) + lock.r > R + HAIR.crown.lift,
-    "side lock does not reach past the hair it sits on",
-  );
-}
 
 assert.ok(HAIR.ponytail.z < 0, "the ponytail belongs at the back of the head");
 
@@ -215,6 +243,25 @@ assert.equal(blend(2, 6, 0), 2, "a blend at 0 is where it started");
 assert.equal(blend(2, 6, 1), 6, "a blend at 1 has arrived");
 assert.equal(blend(2, 6, 0.5), 4, "a blend halfway is halfway");
 
+// ...and easing the weight is what turns the blend into a movement that settles
+// rather than one that stops dead. Both endpoints stay exact, or a finished
+// pose is no longer the pose the rest of this file checks.
+assert.equal(ease(0), 0, "an eased blend at 0 is where it started");
+assert.equal(ease(1), 1, "an eased blend at 1 has arrived");
+assert.equal(ease(0.5), 0.5, "smootherstep is symmetric about the middle");
+assert.equal(ease(-3), 0, "ease clamps below");
+assert.equal(ease(7), 1, "ease clamps above");
+let easedPrev = -1;
+for (let i = 0; i <= 100; i++) {
+  const v = ease(i / 100);
+  assert.ok(v >= easedPrev, "ease must not run backwards");
+  assert.ok(v >= 0 && v <= 1, `ease left the unit range at ${i / 100}`);
+  easedPrev = v;
+}
+// It leaves and arrives slowly, which is the entire reason it is here.
+assert.ok(ease(0.1) < 0.05, "ease does not ease in");
+assert.ok(ease(0.9) > 0.95, "ease does not ease out");
+
 // --- the skirt has to get out of the way -----------------------------------
 // The skirt is a rigid cone hanging from the waist and her whole folded-up leg
 // fits inside it, so a seated pose with the skirt left alone hides the legs
@@ -257,6 +304,63 @@ assert.ok(
 assert.equal(POSTURE.lie.skirtTilt, 0, "lying down, the skirt is left alone");
 assert.equal(POSTURE.lie.skirtTakeUp, 1, "lying down, the skirt is left alone");
 
+// --- the shape of the dress -------------------------------------------------
+// The skirt is revolved from a curve now rather than tapered along a straight
+// line. Two things have to hold: it still meets the bodice and the hem at
+// exactly the radii the rest of the rig measures against, and it never bulges
+// *past* the old straight taper — everything that used to clear the dress has
+// to clear it still.
+{
+  const { topY, bottomY, rTop, rBottom } = RIG.dress;
+  assert.ok(Math.abs(dressRadiusAt(topY) - rTop) < 1e-9, "the bodice has left the collar");
+  assert.ok(Math.abs(dressRadiusAt(bottomY) - rBottom) < 1e-9, "the skirt has left the hem");
+  assert.equal(dressRadiusAt(topY + 1), rTop, "above the dress, the radius holds");
+  assert.equal(dressRadiusAt(bottomY - 1), rBottom, "below the hem, the radius holds");
+
+  for (let i = 0; i <= 100; i++) {
+    const y = bottomY + ((topY - bottomY) * i) / 100;
+    const straight = rBottom + (rTop - rBottom) * ((y - bottomY) / (topY - bottomY));
+    assert.ok(
+      dressRadiusAt(y) <= straight + 1e-9,
+      `the dress bulges past its old taper at y=${y.toFixed(3)}`,
+    );
+    assert.ok(dressRadiusAt(y) > 0, "the dress has collapsed to nothing");
+  }
+
+  // ...and there is an actual waist in it: drawn in below the bodice, then
+  // flared out again well before the hem.
+  assert.ok(
+    dressRadiusAt(RIG.sash.y - 0.14) > dressRadiusAt(RIG.sash.y) + 0.02,
+    "the skirt has stopped flaring below the waist",
+  );
+  const pinched = Math.min(
+    ...Array.from({ length: 40 }, (_, i) => dressRadiusAt(topY - (i / 40) * 0.2)),
+  );
+  assert.ok(pinched < rTop, "the bodice never draws in — she has no waist");
+  assert.ok(pinched > rTop - 0.03, "the waist is a pinch, not a corset");
+}
+
+// The lathed profile has to run bottom to top: `LatheGeometry` takes its
+// normals from the direction the profile runs, and reversed, the dress renders
+// inside out.
+{
+  const profile = skirtProfile(8);
+  assert.equal(profile.length, 9, "skirtProfile dropped a step");
+  const [firstR, firstY] = profile[0];
+  const [lastR, lastY] = profile[profile.length - 1];
+  assert.ok(Math.abs(firstR - RIG.dress.rBottom) < 1e-9, "the profile does not start at the hem");
+  assert.ok(Math.abs(lastR - RIG.dress.rTop) < 1e-9, "the profile does not end at the bodice");
+  assert.ok(Math.abs(lastY) < 1e-12, "the top of the profile is the skirt group's own origin");
+  assert.ok(
+    Math.abs(firstY + (RIG.dress.topY - RIG.dress.bottomY)) < 1e-9,
+    "the profile is not as long as the skirt",
+  );
+  for (let i = 1; i < profile.length; i++) {
+    assert.ok(profile[i][1] > profile[i - 1][1], "the profile must run bottom to top");
+    assert.ok(profile[i][0] > 0, "a lathe point cannot have a negative radius");
+  }
+}
+
 // --- body -------------------------------------------------------------------
 // Arms have to clear the flare of the dress, or the forearms vanish into it.
 const hand = handPosition();
@@ -294,6 +398,34 @@ assert.ok(RIG.petticoat.flare > 0, "the underskirt must show past the hem");
 // The dress joins the torso to the legs with no gap at either end.
 assert.ok(RIG.dress.topY > RIG.shoulderY, "shoulders float above the dress");
 assert.ok(RIG.dress.rBottom > RIG.dress.rTop, "the skirt should flare, not taper");
+
+// Every joint that bends has something sitting over it. A figure assembled from
+// primitives shows daylight at the seams long before its silhouette gives it
+// away, and the knee is the one joint with nothing else covering it.
+assert.ok(RIG.knee.r < RIG.legRadius, "the knee ball bulges out of the thigh");
+assert.ok(
+  RIG.knee.r > RIG.legRadius * 0.92,
+  "the knee ball is narrower than the shin, so the joint still gaps",
+);
+
+// The neck exists in order to stay hidden: it fills the gap under a tilted
+// head, and the collar has to cover it.
+assert.ok(RIG.neck.rBottom > RIG.neck.rTop, "a neck widens into the shoulders");
+assert.ok(RIG.neck.rBottom < 0.13, "the neck is wider than the collar hiding it");
+assert.ok(
+  RIG.neck.y + RIG.neck.height / 2 > RIG.headY - RIG.headR,
+  "the neck stops short of the head and leaves a gap",
+);
+assert.ok(
+  RIG.neck.y - RIG.neck.height / 2 < RIG.dress.topY - 0.02,
+  "the neck stops short of the collar and leaves a gap",
+);
+
+// The shoe is a capsule laid on its side and widened, which only reads as a
+// shoe while it stays wider than it is tall and longer than it is wide.
+assert.ok(RIG.shoe.width > RIG.shoe.height, "the shoe capsule would stand on its edge");
+assert.ok(RIG.shoe.depth > RIG.shoe.width, "the shoe is wider than it is long");
+assert.ok(RIG.shoe.depth > RIG.shoe.height, "no capsule is left between the two caps");
 
 // Chibi proportions: a big head is the point, but she still needs a body.
 const totalHeight = RIG.headY + RIG.headR;
