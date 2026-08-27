@@ -731,10 +731,10 @@ function WallClock() {
       ].map((hand, i) => (
         <mesh
           key={i}
-          position={[Math.sin(hand.a) * hand.r, Math.cos(hand.a) * hand.r, 0.07]}
+          position={[Math.sin(hand.a) * hand.r / 2, Math.cos(hand.a) * hand.r / 2, 0.07]}
           rotation={[0, 0, -hand.a]}
         >
-          <boxGeometry args={[hand.w, hand.r * 2, 0.012]} />
+          <boxGeometry args={[hand.w, hand.r, 0.012]} />
           <meshStandardMaterial color={PALETTE.avatar.eye} roughness={0.6} />
         </mesh>
       ))}
