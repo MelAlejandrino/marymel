@@ -15,6 +15,24 @@ export const PALETTE = {
   grassDark: "#6b8a4c",
   soil: "#6b5540",
 
+  /**
+   * The land beyond the fence. Kept in the same family as `grass` — the lawn
+   * *is* the near end of this ground, so the meadow has to leave it without a
+   * seam — and then pulled apart by height and slope alone: paler and drier on
+   * the tops, stony where it is too steep to hold soil, deeper in the hollows.
+   */
+  hill: {
+    /** Hollows and the folds between ridges, where the sky reaches less. */
+    hollow: "#5f7f4a",
+    /** Sun-caught crests: drier, paler, less green. */
+    crest: "#a6b273",
+    /** Stone breaking through the steepest faces. */
+    scree: "#a2947f",
+    /** What the far ground gives up to. Sits between the fog and the sky, so
+     *  the horizon has no seam in it either. */
+    haze: "#dcbca4",
+  },
+
   wall: "#f2e4d0",
   wallShade: "#e2d0b8",
   timber: "#8a6a52",

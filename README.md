@@ -71,6 +71,9 @@ Optional, seed-only: `SEED_ADMIN_EMAIL`, `SEED_PLAYER_EMAIL`, `SEED_PASSWORD`.
 | `game/world/layout.ts` | where everything is; renderer and collision both read it |
 | `game/world/palette.ts` | every colour in the world, picked as one set |
 | `game/world/House.tsx` `Garden.tsx` `Sky.tsx` `Lighting.tsx` | the scene, one concern each |
+| `game/world/terrain.ts` | the land beyond the fence: height field, hills, shade — three-free and tested |
+| `game/world/terrainMesh.ts` | `buildTerrainGeometry()` turns the field into a polar mesh; split out so it can be tested without three |
+| `game/world/Terrain.tsx` | mounts the mesh; also stands in for the lawn the old `Garden` ground plane used to be |
 | `game/world/scatter.ts` | deterministic placement for grass, flowers, bushes |
 | `game/interaction/` | proximity prompts — doors, NPCs, mini-games all use it |
 | `game/input.ts` | one input surface, written by keyboard and touch alike |

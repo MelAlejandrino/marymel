@@ -272,13 +272,11 @@ function Path() {
 export function Garden() {
   return (
     <group>
-      {/* Ground reaches well past the fence, so the horizon fades into fog
-          instead of ending at a visible edge. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[WORLD_BOUNDS * 4, WORLD_BOUNDS * 4]} />
-        <meshStandardMaterial color={PALETTE.grass} roughness={1} />
-      </mesh>
-
+      {/* No ground plane here any more: `Terrain.tsx` is the ground, lawn and
+          hills alike. Two surfaces at y = 0 fought over every pixel, and the
+          plane's own edge at 96 across cut a straight line through the hills
+          behind it. Everything below still stands at y = 0, because the height
+          field is nailed flat across the whole fenced clearing. */}
       <Path />
       <Fence />
       <GrassTufts />

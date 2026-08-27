@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { BackSide, Color } from "three";
 
 import { PALETTE } from "./palette.ts";
-import { WORLD_BOUNDS } from "./layout.ts";
+import { TERRAIN_RADIUS } from "./terrain.ts";
 
 /**
  * A gradient dome rather than a flat background colour. A single flat colour
@@ -46,7 +46,13 @@ export function Sky() {
 
   return (
     <mesh>
-      <sphereGeometry args={[WORLD_BOUNDS * 3.4, 32, 16]} />
+      {/*
+        Wide enough to stand outside the terrain, which now reaches 185 out —
+        a dome inside the hills would be *behind* the far ones, and the whole
+        far range drew over the top of the sky. Still well inside the camera's
+        far plane of 320.
+      */}
+      <sphereGeometry args={[TERRAIN_RADIUS * 1.35, 32, 16]} />
       <shaderMaterial
         uniforms={uniforms}
         vertexShader={vertexShader}
