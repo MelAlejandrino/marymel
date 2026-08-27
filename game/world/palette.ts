@@ -36,6 +36,18 @@ export const PALETTE = {
   leaves: ["#7fa86a", "#8fba77", "#6f9a5e"],
   blossom: ["#f2a2ae", "#f7d6e0", "#ffd9a0", "#e8b4d0"],
 
+  /** The rabbits. Three coats — cream, dust and cocoa — against one shared
+   *  cream underside, so a herd of them still reads as one set. */
+  rabbit: {
+    fur: ["#f4e7d6", "#cbbca9", "#9b7a5f"],
+    belly: "#fffaf2",
+    /** Inside of the ear, and the nose. */
+    inner: "#eda9b2",
+    nose: "#e07f8e",
+    eye: "#3a2a2e",
+    whisker: "#fff6ec",
+  },
+
   /** Indoors. Warmer and lower-contrast than the exterior, so the room reads
    *  as lamplit rather than as more garden with a roof over it. */
   home: {

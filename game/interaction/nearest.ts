@@ -12,6 +12,7 @@ export type InteractionVerb =
   | "READ"
   | "COLLECT"
   | "PLAY"
+  | "PET"
   | "ENTER"
   | "EXAMINE"
   // The furniture's verbs. The prompt reads "verb + label", so the verb has to

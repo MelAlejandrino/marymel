@@ -162,7 +162,151 @@ export const POSTURE = {
     skirtTilt: 0,
     skirtTakeUp: 1,
   },
+  /**
+   * Crouched down to pet an animal. Not a seat: she keeps her feet, so this
+   * one is a layer over whatever else she is doing rather than a posture, and
+   * `crouchDrop()` below brings her hips down with her folded legs.
+   *
+   * The shin cancels the thigh (they sum to zero), which keeps her soles flat
+   * on the grass — a crouch with the feet pitched nose-down reads as tiptoe.
+   */
+  pat: {
+    thigh: -1.128,
+    shin: 1.128,
+    /** Leaning in over the animal. */
+    lean: 0.28,
+    /** The stroking arm: down and forward. Negative is forward. */
+    arm: -0.95,
+    /**
+     * ...and out to her right, which is the whole reason the animal is petted
+     * beside her instead of in front of her. Reaching *inward* put her hand on
+     * her own centre line, and the animal that came to meet it ended up under
+     * her skirt.
+     */
+    armOut: 0.62,
+    /** How far the stroke sweeps, either side of `arm`. */
+    stroke: 0.2,
+    /** The other hand rests on her knee. */
+    restArm: -0.5,
+    restArmOut: 0.3,
+    /**
+     * The skirt barely moves. A big forward tilt swings the hem out over
+     * exactly the ground the animal is standing on — and the hem is a rigid
+     * cone, so whatever it reaches over, it covers.
+     */
+    skirtTilt: -0.05,
+    skirtTakeUp: 0.95,
+    /** Looking down at what she is petting. */
+    headPitch: 0.34,
+  },
 } as const;
+
+/**
+ * How far her hips drop in the crouch.
+ *
+ * Derived, not eyeballed: her legs fold at the hip and the knee, and the whole
+ * body has to come down by however much shorter that makes them, or she
+ * crouches with her feet hanging in the air.
+ */
+export function crouchDrop(): number {
+  const standing = footFromHip(0, 0).drop;
+  return standing - footFromHip(POSTURE.pat.thigh, POSTURE.pat.shin).drop;
+}
+
+/**
+ * Where her patting hand actually ends up, in her own space, at `stroke` along
+ * the sweep (-1..1).
+ *
+ * This is the contract between her and the animal: `world/critters.ts` sizes
+ * the rabbit against this number and puts it where the hand will be, and
+ * `critters.test.ts` fails if the two ever stop meeting. Reaching for a rabbit
+ * and missing it by five centimetres is the whole difference between petting
+ * an animal and miming.
+ */
+export function patHand(stroke = 0): Point3 {
+  const { arm, armOut, stroke: sweep, lean } = POSTURE.pat;
+  const forward = arm + stroke * sweep;
+  // Euler XYZ: the z rotation swings the arm out (or in) first, so the reach
+  // the x rotation then swings forward is shortened by cos(armOut).
+  const reach = RIG.armLength * Math.cos(armOut);
+  const local = {
+    x: RIG.armX + RIG.armLength * Math.sin(armOut),
+    y: RIG.shoulderY - reach * Math.cos(forward),
+    z: -reach * Math.sin(forward),
+  };
+  // Then the whole torso leans in over the animal and the hips drop.
+  return {
+    x: local.x,
+    y: local.y * Math.cos(lean) - local.z * Math.sin(lean) - crouchDrop(),
+    z: local.y * Math.sin(lean) + local.z * Math.cos(lean),
+  };
+}
+
+/** The underside of her palm — what has to land on the animal's head. */
+export function patHandBottom(stroke = 0): number {
+  return patHand(stroke).y - RIG.hand.r;
+}
+
+/** How far she turns her head to look at what she is petting: it is beside
+ *  her, not in front of her, so she has to actually look at it. Clamped to the
+ *  same limit as every other glance — a head that turns past the shoulders is
+ *  the difference between charming and unsettling. */
+export function patLook(limit = 0.7): number {
+  const hand = patHand();
+  return Math.min(limit, Math.max(-limit, Math.atan2(hand.x, hand.z)));
+}
+
+/** How far forward the front lip of the hem reaches, in her own space. */
+export function hemFrontZ(tilt: number, takeUp: number): number {
+  const length = (RIG.dress.topY - RIG.dress.bottomY) * takeUp;
+  // Rotate (0, -length, +rBottom) about x and read off the depth.
+  return -length * Math.sin(tilt) + RIG.dress.rBottom * Math.cos(tilt);
+}
+
+/**
+ * How far her skirt reaches from her own axis while she is crouched — the
+ * radius of the cylinder that contains the hem, whichever way it is tilted.
+ *
+ * Anything she is petting has to stand outside this. Sampled rather than
+ * solved: the hem is a circle tilted about one axis and then leaned about the
+ * same one, and the furthest point of that is not worth deriving.
+ */
+export function patSkirtReach(): number {
+  const { skirtTilt, skirtTakeUp, lean } = POSTURE.pat;
+  const length = (RIG.dress.topY - RIG.dress.bottomY) * skirtTakeUp;
+  const total = lean + skirtTilt;
+  let reach = 0;
+
+  for (let i = 0; i < 64; i++) {
+    const phi = (i / 64) * Math.PI * 2;
+    const x = RIG.dress.rBottom * Math.sin(phi);
+    // The hem point in the skirt's own space, then swung by tilt *and* lean —
+    // both are rotations about x, so they simply add.
+    const ring = RIG.dress.rBottom * Math.cos(phi);
+    const z = -length * Math.sin(total) + ring * Math.cos(total);
+    // The waist moves forward with the lean, carrying the hem with it.
+    const waist = RIG.dress.topY * Math.sin(lean);
+    reach = Math.max(reach, Math.hypot(x, z + waist));
+  }
+  return reach;
+}
+
+/**
+ * The front lip of her hem while she is crouched, in world space.
+ *
+ * This is the thing the animal has to stay clear of: the skirt swings and
+ * drops with her whole torso, so where the hem ends up is not obvious from
+ * looking at the pose numbers, and getting it wrong reads *very* badly.
+ */
+export function patHemFront(): { y: number; z: number } {
+  const { skirtTilt, skirtTakeUp, lean } = POSTURE.pat;
+  const y = hemFrontY(skirtTilt, skirtTakeUp);
+  const z = hemFrontZ(skirtTilt, skirtTakeUp);
+  return {
+    y: y * Math.cos(lean) - z * Math.sin(lean) - crouchDrop(),
+    z: y * Math.sin(lean) + z * Math.cos(lean),
+  };
+}
 
 /** How high the hip sits above the seat surface when she is sitting on it. */
 export const SEAT_HIP_LIFT = RIG.hipY;

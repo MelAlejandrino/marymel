@@ -3,6 +3,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { Color, Matrix4, Quaternion, Vector3, type InstancedMesh } from "three";
 
+import { BUSHES } from "./critters.ts";
 import {
   FENCE,
   HOUSE_FRONT_OUTER,
@@ -11,6 +12,7 @@ import {
   WORLD_BOUNDS,
 } from "./layout.ts";
 import { PALETTE } from "./palette.ts";
+import { Rabbits } from "./Rabbit.tsx";
 import { hashRandom, scatter, type Placement } from "./scatter.ts";
 
 /**
@@ -98,10 +100,8 @@ function GrassTufts() {
 }
 
 function Bushes() {
-  const placements = useMemo(
-    () => scatter(46, 53, { minScale: 0.75, maxScale: 1.5 }),
-    [],
-  );
+  // Shared with the rabbits, which are placed to avoid them.
+  const placements = BUSHES;
   const build = useMemo(
     () => (i: number) => ({
       matrix: matrixFor(placements[i], 0.34),
@@ -284,6 +284,7 @@ export function Garden() {
       <GrassTufts />
       <Bushes />
       <Flowers />
+      <Rabbits />
       {TREES.map((tree, i) => (
         <Tree key={i} {...tree} />
       ))}

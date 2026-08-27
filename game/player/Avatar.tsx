@@ -9,6 +9,7 @@ import type { AvatarMotion } from "./motion.ts";
 import {
   blend,
   blinkScale,
+  crouchDrop,
   dressRadiusAt,
   FACE,
   HAIR,
@@ -148,7 +149,8 @@ export function Avatar({ motion }: { motion: RefObject<AvatarMotion> }) {
   const skirt = useRef<Group>(null);
 
   useFrame(() => {
-    const { gait, stride, headYaw, elapsed, posture, poseBlend } = motion.current;
+    const { gait, stride, headYaw, elapsed, posture, poseBlend, pat, patStroke } =
+      motion.current;
     const swing = Math.sin(stride);
     // `t` is how far she is out of standing. At 0 everything below reduces to
     // the walk cycle exactly as it was, so the posed case cannot regress it.
@@ -216,6 +218,58 @@ export function Avatar({ motion }: { motion: RefObject<AvatarMotion> }) {
       skirt.current.scale.y = blend(1, pose.skirtTakeUp, t);
     }
 
+    /*
+      --- crouching to pet something ---
+
+      A layer on top of everything above, not another posture: she is on her
+      feet, so the walk cycle still owns her the instant the crouch runs out.
+      Everything here reads the joints that were just set and blends them the
+      rest of the way down, which means `pat === 0` leaves the pose untouched.
+    */
+    if (pat > 0) {
+      const P = POSTURE.pat;
+      const bend = (joint: typeof legL, to: number) => {
+        if (joint.current) joint.current.rotation.x = blend(joint.current.rotation.x, to, pat);
+      };
+      bend(legL, P.thigh);
+      bend(legR, P.thigh);
+      bend(kneeLj, P.shin);
+      bend(kneeRj, P.shin);
+
+      if (body.current) {
+        // Her hips have to come down with her folded legs, or she crouches
+        // with her feet in the air.
+        body.current.position.y = blend(body.current.position.y, -crouchDrop(), pat);
+        body.current.rotation.x = blend(body.current.rotation.x, P.lean, pat);
+        body.current.rotation.z = blend(body.current.rotation.z, 0, pat);
+      }
+      // Right hand does the stroking; the left rests on her knee.
+      if (armR.current) {
+        armR.current.rotation.x = blend(
+          armR.current.rotation.x,
+          P.arm + patStroke * P.stroke,
+          pat,
+        );
+        armR.current.rotation.z = blend(armR.current.rotation.z, P.armOut, pat);
+      }
+      if (armL.current) {
+        armL.current.rotation.x = blend(armL.current.rotation.x, P.restArm, pat);
+        armL.current.rotation.z = blend(armL.current.rotation.z, -P.restArmOut, pat);
+      }
+      if (head.current) {
+        // Looking down at it, and a little nod on each stroke.
+        head.current.rotation.x = blend(
+          head.current.rotation.x,
+          P.headPitch + patStroke * 0.05,
+          pat,
+        );
+      }
+      if (skirt.current) {
+        skirt.current.rotation.x = blend(skirt.current.rotation.x, P.skirtTilt, pat);
+        skirt.current.scale.y = blend(skirt.current.scale.y, P.skirtTakeUp, pat);
+      }
+    }
+
     // The ponytail trails the head and bounces with each step.
     if (ponytail.current) {
       ponytail.current.rotation.x = blend(
@@ -225,6 +279,11 @@ export function Avatar({ motion }: { motion: RefObject<AvatarMotion> }) {
         t,
       );
       ponytail.current.rotation.z = -headYaw * 0.5;
+      // Leaning forward, it falls over her shoulder rather than sticking out
+      // behind her at the same angle it does when she is upright.
+      if (pat > 0) {
+        ponytail.current.rotation.x = blend(ponytail.current.rotation.x, -0.35, pat);
+      }
     }
   });
 

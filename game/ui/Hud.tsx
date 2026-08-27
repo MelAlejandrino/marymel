@@ -10,6 +10,7 @@ const VERB_LABEL: Record<string, string> = {
   READ: "Read",
   COLLECT: "Take",
   PLAY: "Play",
+  PET: "Pet",
   ENTER: "Enter",
   EXAMINE: "Look at",
   SIT: "Sit on",

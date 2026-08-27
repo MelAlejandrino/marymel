@@ -22,6 +22,14 @@ export type AvatarMotion = {
    * joints blend rather than snapping on the frame the key is pressed.
    */
   poseBlend: number;
+  /**
+   * 0..1, how far down she is crouched to pet something. A layer over
+   * everything above rather than a posture of its own: she keeps her feet, and
+   * at 0 none of it applies.
+   */
+  pat: number;
+  /** -1..1, where her hand is in the stroke. -1 is lifted, +1 is down on it. */
+  patStroke: number;
 };
 
 export function createMotion(): AvatarMotion {
@@ -32,5 +40,7 @@ export function createMotion(): AvatarMotion {
     elapsed: 0,
     posture: "stand",
     poseBlend: 0,
+    pat: 0,
+    patStroke: 0,
   };
 }

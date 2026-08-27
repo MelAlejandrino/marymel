@@ -16,6 +16,15 @@ import { collidersFor, PLAYER_RADIUS, SPAWN, WORLD_BOUNDS } from "../world/layou
 import { Avatar } from "./Avatar.tsx";
 import { createMotion, type AvatarMotion } from "./motion.ts";
 import {
+  crouchWeight,
+  endPet,
+  PET,
+  PET_SECONDS,
+  petting,
+  strokeOffset,
+} from "./petting.ts";
+import { patLook } from "./rig.ts";
+import {
   POSE_SECONDS,
   poseHeight,
   seating,
@@ -28,6 +37,7 @@ import {
   headTurn,
   moveDirection,
   steer,
+  wrapAngle,
 } from "./movement.ts";
 
 const WALK_SPEED = 4.2;
@@ -143,6 +153,7 @@ export function Player({
       // A mini-game taking the controls while she is sitting would leave her
       // stuck in a chair it has no prompt to get out of.
       if (seating.current) standUp();
+      if (petting.current) endPet();
       velocity.current.x = 0;
       velocity.current.z = 0;
       motion.current.gait = 0;
@@ -184,8 +195,31 @@ export function Player({
     }
     settlePose(motion.current, delta, null);
 
+    // --- petting an animal -------------------------------------------------
+    /*
+      She stays where she is and crouches; the animal comes to her hand. The
+      timing of both halves lives in `petting.ts`, and the store is what the
+      animal reads to know where her hand will be.
+    */
+    const pet = petting.current;
+    if (pet) {
+      pet.elapsed += delta;
+      pet.playerX = position.current.x;
+      pet.playerZ = position.current.z;
+      pet.playerFacing = facing.current;
+      // Walking off calls it off — but through the stand-up, so she is never
+      // left snapping out of a crouch.
+      if (input.move.x !== 0 || input.move.y !== 0) {
+        pet.elapsed = Math.max(pet.elapsed, PET_SECONDS - PET.release);
+      }
+      if (pet.elapsed >= PET_SECONDS) endPet();
+    }
+    // Zero once the gesture is over, whichever way it ended.
+    motion.current.pat = crouchWeight(pet ? pet.elapsed : PET_SECONDS);
+    motion.current.patStroke = pet ? strokeOffset(pet.elapsed) : 0;
+
     // --- intent -> world-space velocity -----------------------------------
-    const dir = moveDirection(input.move, yaw.current);
+    const dir = pet ? { x: 0, z: 0 } : moveDirection(input.move, yaw.current);
     const targetX = dir.x * WALK_SPEED;
     const targetZ = dir.z * WALK_SPEED;
     velocity.current.x = damp(velocity.current.x, targetX, ACCELERATION, delta);
@@ -204,17 +238,36 @@ export function Player({
     position.current = next;
     mesh.position.set(next.x, 0, next.z);
 
-    // --- face the direction of travel -------------------------------------
+    // --- face the direction of travel, or the animal ----------------------
     const speed = Math.hypot(velocity.current.x, velocity.current.z);
-    facing.current = steer(facing.current, velocity.current, TURN_LAMBDA, delta);
+    if (pet) {
+      // Turn to where it was standing when she reached out, not to where it
+      // has hopped since: it is coming to a spot in front of her, so aiming at
+      // its live position would have the two of them circling each other.
+      const want = Math.atan2(pet.x - next.x, pet.z - next.z);
+      facing.current = damp(
+        facing.current,
+        facing.current + wrapAngle(want - facing.current),
+        8,
+        delta,
+      );
+    } else {
+      facing.current = steer(facing.current, velocity.current, TURN_LAMBDA, delta);
+    }
     mesh.rotation.y = facing.current;
 
     // --- pose -------------------------------------------------------------
     const pose = motion.current;
     pose.gait = Math.min(speed / WALK_SPEED, 1);
     pose.stride += speed * delta * 2.6;
-    // She glances toward whatever the camera is looking at.
-    pose.headYaw = damp(pose.headYaw, headTurn(yaw.current, facing.current), 9, delta);
+    // She glances toward whatever the camera is looking at — except while she
+    // is petting something, which is beside her, so she turns to look at it.
+    pose.headYaw = damp(
+      pose.headYaw,
+      pet ? patLook() : headTurn(yaw.current, facing.current),
+      9,
+      delta,
+    );
 
     // --- camera follow ----------------------------------------------------
     followCamera(state, next, yaw.current, delta, colliders);
